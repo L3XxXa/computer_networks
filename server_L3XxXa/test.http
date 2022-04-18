@@ -1,0 +1,10 @@
+GET http://127.0.0.1:1337/check
+Accept: application/json
+
+###
+GET http://127.0.0.1:1337/sayhello
+Accept: application/json
+
+###
+GET http://127.0.0.1:1337/responsehtml
+Accept: text/html
