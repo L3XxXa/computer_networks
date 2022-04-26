@@ -1,3 +1,3 @@
 ## Repo for computer-networking labs
-	Сделаны:
+	Сдана:
 		* Лаба 7 - простой хттп сервер 
