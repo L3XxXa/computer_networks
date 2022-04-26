@@ -1,13 +1,16 @@
 package com.example.plugins
 
-import com.example.*
-import io.ktor.websocket.*
+import com.example.Connection
 import io.ktor.server.application.*
+import io.ktor.server.engine.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
-import java.time.*
+import io.ktor.websocket.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.time.Duration
 import java.util.*
-import kotlin.collections.LinkedHashSet
+import kotlin.system.exitProcess
 
 fun Application.configureSockets() {
     install(WebSockets) {
@@ -16,22 +19,32 @@ fun Application.configureSockets() {
         maxFrameSize = Long.MAX_VALUE
         masking = false
     }
-
-    routing{
+    routing {
         val connections = Collections.synchronizedSet<Connection?>(LinkedHashSet())
-        webSocket("/chat"){
-            println("Connecting")
-            val thisConnection = Connection(this)
+        webSocket("/chat/{name}") {
+            println("Connecting ${call.parameters["name"].toString()}")
+            val thisConnection = Connection(this, call.parameters["name"].toString())
             connections += thisConnection
-            send("You are connected Total users:${connections.count()}")
-            for(frame in incoming) {
-                frame as? Frame.Text ?: continue
-                val receivedText = frame.readText()
-                val message = "User${thisConnection.name}: $receivedText"
-                connections.forEach{
-                    it.session.send(message)
+            try {
+                send("You are connected Total users:${connections.count()}")
+                for (frame in incoming) {
+                    frame as? Frame.Text ?: continue
+                    val receivedText = frame.readText()
+                    val message = "${thisConnection.name}: $receivedText"
+                    connections.forEach {
+                        it.session.send(message)
+                    }
+
                 }
+            } catch (e: Exception) {
+                println("Server was stopped")
+            }
+            finally {
+                println("Logging out user ${thisConnection.name}")
+                connections -= thisConnection
             }
         }
     }
 }
+
+
