@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.util.*
+import kotlin.collections.LinkedHashSet
 import kotlin.system.exitProcess
 
 fun Application.configureSockets() {
@@ -19,10 +20,14 @@ fun Application.configureSockets() {
         maxFrameSize = Long.MAX_VALUE
         masking = false
     }
+
     routing {
         val connections = Collections.synchronizedSet<Connection?>(LinkedHashSet())
-        webSocket("/chat/{name}") {
-            println("Connecting ${call.parameters["name"].toString()}")
+        webSocket("/") {
+            var privateMessage = LinkedHashSet<Connection>()
+            val name = call.parameters["name"].toString()
+            var toUser: Connection? = null
+            println("Connecting $name")
             val thisConnection = Connection(this, call.parameters["name"].toString())
             connections += thisConnection
             try {
@@ -30,11 +35,25 @@ fun Application.configureSockets() {
                 for (frame in incoming) {
                     frame as? Frame.Text ?: continue
                     val receivedText = frame.readText()
-                    val message = "${thisConnection.name}: $receivedText"
-                    connections.forEach {
-                        it.session.send(message)
+                    var message = "${thisConnection.name}: $receivedText"
+                    connections.forEach{
+                        if (receivedText.contains("@" + it.name)){
+                            privateMessage.add(it)
+                            val messageWithoutName = receivedText.replace("@${it.name}", "")
+                            message = "By ${thisConnection.name}: $messageWithoutName"
+                        }
                     }
-
+                    if (privateMessage.isEmpty()) {
+                        connections.forEach{
+                            it.session.send(message)
+                        }
+                    }
+                    else {
+                        privateMessage.forEach{
+                            it.session.send(message)
+                        }
+                        privateMessage.clear()
+                    }
                 }
             } catch (e: Exception) {
                 println("Server was stopped")
